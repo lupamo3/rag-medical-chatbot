@@ -14,11 +14,15 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-## Copying all contents from local to container
+# Install Python deps first
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy rest of the app
 COPY . .
 
-## Install Python dependencies
-RUN pip install --no-cache-dir -e .
+# Make sure /app is on PYTHONPATH
+ENV PYTHONPATH=/app
 
 ## Expose only flask port
 EXPOSE 5000

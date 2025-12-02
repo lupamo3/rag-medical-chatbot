@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = 'us-east-1'
+        AWS_REGION = 'us-east-2'
         ECR_REPO = 'my-repo'
         IMAGE_TAG = 'latest'
         SERVICE_NAME = 'llmops-medical-service'
@@ -13,14 +13,14 @@ pipeline {
             steps {
                 script {
                     echo 'Cloning GitHub repo to Jenkins...'
-                    checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[credentialsId: 'github-token', url: 'https://github.com/data-guru0/RAG-MEDICAL-CHATBOT.git']])
+                    checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[credentialsId: 'github-token', url: 'https://github.com/lupamo3/rag-medical-chatbot.git']])
                 }
             }
         }
 
         stage('Build, Scan, and Push Docker Image to ECR') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-token']]) {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-creds']]) {
                     script {
                         def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
                         def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"

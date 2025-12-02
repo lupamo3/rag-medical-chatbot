@@ -1,5 +1,11 @@
-from langchain.chains import RetrievalQA
+# from langchain.chains import RetrievalQA
 from langchain_core.prompts import PromptTemplate
+try:
+    # Old path (LangChain < 1.0)
+    from langchain.chains import RetrievalQA
+except ModuleNotFoundError:
+    # New home for the classic APIs (LangChain 1.x)
+    from langchain_classic.chains import RetrievalQA
 
 from app.components.llm import load_llm
 from app.components.vector_store import load_vector_store
