@@ -2,7 +2,7 @@ FROM jenkins/jenkins:lts
 
 USER root
 
-# Base tools + Docker CLI
+# Base tools + Docker CLI + unzip (you already have this)
 RUN apt-get update -y && \
     apt-get install -y ca-certificates curl gnupg unzip && \
     mkdir -p /etc/apt/keyrings && \
@@ -15,6 +15,9 @@ RUN apt-get update -y && \
     apt-get update -y && \
     apt-get install -y docker-ce-cli && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Enable binfmt/qemu so Docker Buildx can cross-build (multi-arch)
+RUN docker run --privileged --rm tonistiigi/binfmt --install all || true
 
 # Install AWS CLI v2 (detect arch: x86_64 vs aarch64/arm64)
 RUN ARCH=$(uname -m) && \
