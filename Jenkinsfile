@@ -18,6 +18,28 @@ pipeline {
             }
         }
 
+        // stage('Build, Scan, and Push Docker Image to ECR') {
+        //     steps {
+        //         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-creds']]) {
+        //             script {
+        //                 def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
+        //                 def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
+        //                 def imageFullTag = "${ecrUrl}:${IMAGE_TAG}"
+
+        //                 sh """
+        //                 aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}
+        //                 docker build -t ${env.ECR_REPO}:${IMAGE_TAG} .
+        //                 trivy image --severity HIGH,CRITICAL --format json -o trivy-report.json ${env.ECR_REPO}:${IMAGE_TAG} || true
+        //                 docker tag ${env.ECR_REPO}:${IMAGE_TAG} ${imageFullTag}
+        //                 docker push ${imageFullTag}
+        //                 """
+
+        //                 archiveArtifacts artifacts: 'trivy-report.json', allowEmptyArchive: true
+        //             }
+        //         }
+        //     }
+        // }
+
         stage('Build, Scan, and Push Docker Image to ECR') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-creds']]) {
@@ -28,10 +50,19 @@ pipeline {
 
                         sh """
                         aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}
-                        docker build -t ${env.ECR_REPO}:${IMAGE_TAG} .
-                        trivy image --severity HIGH,CRITICAL --format json -o trivy-report.json ${env.ECR_REPO}:${IMAGE_TAG} || true
-                        docker tag ${env.ECR_REPO}:${IMAGE_TAG} ${imageFullTag}
-                        docker push ${imageFullTag}
+
+                        # ensure buildx builder exists
+                        docker buildx create --name ci-builder --use || docker buildx use ci-builder
+
+                        # build linux/amd64 and push directly
+                        docker buildx build \
+                        --platform linux/amd64 \
+                        -t ${imageFullTag} \
+                        --push \
+                        .
+
+                        # security scan (optional, now pulls the just-pushed amd64 image)
+                        trivy image --severity HIGH,CRITICAL --format json -o trivy-report.json ${imageFullTag} || true
                         """
 
                         archiveArtifacts artifacts: 'trivy-report.json', allowEmptyArchive: true
@@ -40,25 +71,25 @@ pipeline {
             }
         }
 
-        //  stage('Deploy to AWS App Runner') {
-        //     steps {
-        //         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-creds']]) {
-        //             script {
-        //                 def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
-        //                 def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
-        //                 def imageFullTag = "${ecrUrl}:${IMAGE_TAG}"
+         stage('Deploy to AWS App Runner') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-creds']]) {
+                    script {
+                        def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
+                        def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
+                        def imageFullTag = "${ecrUrl}:${IMAGE_TAG}"
 
-        //                 echo "Triggering deployment to AWS App Runner..."
+                        echo "Triggering deployment to AWS App Runner..."
 
-        //                 sh """
-        //                 SERVICE_ARN=\$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='${SERVICE_NAME}'].ServiceArn" --output text --region ${AWS_REGION})
-        //                 echo "Found App Runner Service ARN: \$SERVICE_ARN"
+                        sh """
+                        SERVICE_ARN=\$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='${SERVICE_NAME}'].ServiceArn" --output text --region ${AWS_REGION})
+                        echo "Found App Runner Service ARN: \$SERVICE_ARN"
 
-        //                 aws apprunner start-deployment --service-arn \$SERVICE_ARN --region ${AWS_REGION}
-        //                 """
-        //             }
-        //         }
-        //     }
-        // }
+                        aws apprunner start-deployment --service-arn \$SERVICE_ARN --region ${AWS_REGION}
+                        """
+                    }
+                }
+            }
+        }
     }
 }
