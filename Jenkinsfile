@@ -44,24 +44,29 @@ pipeline {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-creds']]) {
                     script {
-                        def accountId = sh(script: "aws sts get-caller-identity --query Account --output text", returnStdout: true).trim()
+                        def accountId = sh(
+                            script: "aws sts get-caller-identity --query Account --output text",
+                            returnStdout: true
+                        ).trim()
+
                         def ecrUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.ECR_REPO}"
                         def imageFullTag = "${ecrUrl}:${IMAGE_TAG}"
 
                         sh """
-                        aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ecrUrl}
+                        aws ecr get-login-password --region ${AWS_REGION} | \
+                        docker login --username AWS --password-stdin ${ecrUrl}
 
-                        # ensure buildx builder exists
+                        # Create or reuse buildx builder
                         docker buildx create --name ci-builder --use || docker buildx use ci-builder
 
-                        # build linux/amd64 and push directly
+                        # Build for linux/amd64 and push directly to ECR
                         docker buildx build \
                         --platform linux/amd64 \
                         -t ${imageFullTag} \
                         --push \
                         .
 
-                        # security scan (optional, now pulls the just-pushed amd64 image)
+                        # Optional: scan the pushed image
                         trivy image --severity HIGH,CRITICAL --format json -o trivy-report.json ${imageFullTag} || true
                         """
 
@@ -70,6 +75,7 @@ pipeline {
                 }
             }
         }
+
 
          stage('Deploy to AWS App Runner') {
             steps {
