@@ -1,7 +1,7 @@
+import os
 from flask import Flask,render_template,request,session,redirect,url_for
 from app.components.retriever import create_qa_chain
 from dotenv import load_dotenv
-import os
 
 
 load_dotenv()

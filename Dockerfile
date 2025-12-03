@@ -1,5 +1,5 @@
 ## Parent image
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 ## Essential environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python deps first
+# Install Python deps first (export from Poetry!)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -27,7 +27,5 @@ ENV PYTHONPATH=/app
 ## Expose only flask port
 EXPOSE 5000
 
-## Run the Flask app
-CMD ["python", "app/application.py"]
-
-
+## Run the Flask app the same way as local
+CMD ["python", "-m", "app.application"]
